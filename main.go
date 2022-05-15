@@ -46,7 +46,7 @@ type CSVAble interface {
 }
 
 type transaction struct {
-	source_contribution_id int
+	source_transaction_id int
 	contributor_id,
 	transaction_type,
 	committee_name,
@@ -54,17 +54,18 @@ type transaction struct {
 	transaction_category,
 	date_occurred,
 	amount,
+	report_name,
+	account_code,
 	form_of_payment,
 	purpose,
 	candidate_referendum_name,
 	declaration,
-	original_committee_sboe_id,
-	original_account_id string
+	original_committee_sboe_id string
 }
 
 func (t transaction) ToCSV() []string {
 	return []string{
-		fmt.Sprint(t.source_contribution_id),
+		fmt.Sprint(t.source_transaction_id),
 		t.contributor_id,
 		t.transaction_type,
 		t.committee_name,
@@ -72,18 +73,19 @@ func (t transaction) ToCSV() []string {
 		t.transaction_category,
 		t.date_occurred,
 		t.amount,
+		t.report_name,
+		t.account_code,
 		t.form_of_payment,
 		t.purpose,
 		t.candidate_referendum_name,
 		t.declaration,
 		t.original_committee_sboe_id,
-		t.original_account_id,
 	}
 }
 
 func (t transaction) Header() []string {
 	return []string{
-		"source_contribution_id",
+		"source_transaction_id",
 		"contributor_id",
 		"transaction_type",
 		"committee_name",
@@ -91,42 +93,51 @@ func (t transaction) Header() []string {
 		"transaction_category",
 		"date_occurred",
 		"amount",
+		"report_name",
+		"account_code",
 		"form_of_payment",
 		"purpose",
 		"candidate_referendum_name",
 		"declaration",
 		"original_committee_sboe_id",
-		"original_account_id",
 	}
 }
 
 func (t *transaction) setId(id int) {
-	t.source_contribution_id = id
+	t.source_transaction_id = id
 }
 
 type account struct {
-	account_id    string // TODO: probably change this
-	name          string
-	street_line_1 string
-	street_line_2 string
-	city          string
-	state         string
-	zip           string
-	profession    string
-	employer_name string
+	account_id      string // TODO: probably change this
+	name            string
+	street_line_1   string
+	street_line_2   string
+	city            string
+	state           string
+	zip             string
+	profession      string
+	employer_name   string
+	is_donor        bool
+	is_vendor       bool
+	is_person       bool
+	is_organization bool
 }
 
 func (a account) ToCSV() []string {
 	return []string{
 		a.account_id,
 		a.name,
-		a.street_line_1,
-		a.street_line_2,
+		// a.street_line_1,
+		// a.street_line_2,
 		a.city,
 		a.state,
 		a.zip,
 		a.profession,
 		a.employer_name,
+		fmt.Sprint(a.is_donor),
+		fmt.Sprint(a.is_vendor),
+		fmt.Sprint(a.is_person),
+		fmt.Sprint(a.is_organization),
 	}
 }
 
@@ -134,19 +145,24 @@ func (a account) Header() []string {
 	return []string{
 		"account_id",
 		"name",
-		"street_line_1",
-		"street_line_2",
+		// "street_line_1",
+		// "street_line_2",
 		"city",
 		"state",
-		"zip",
+		"zip_code",
 		"profession",
 		"employer_name",
+		"is_donor",
+		"is_vendor",
+		"is_person",
+		"is_organization",
 	}
 }
 
 type committee struct {
 	sboe_id            string
 	committee_name     string
+	committee_type     string
 	committee_street_1 string
 	committee_street_2 string
 	committee_city     string
@@ -154,15 +170,20 @@ type committee struct {
 	committee_zip_code string
 	candidate_full_name,
 	candidate_first_last_name,
+	candidate_first_name,
+	candidate_last_name,
+	candidate_middle_name,
 	party,
 	office,
-	juris string
+	juris,
+	current_status string
 }
 
 func (c committee) ToCSV() []string {
 	return []string{
 		c.sboe_id,
 		c.committee_name,
+		c.committee_type,
 		c.committee_street_1,
 		c.committee_street_2,
 		c.committee_city,
@@ -170,9 +191,13 @@ func (c committee) ToCSV() []string {
 		c.committee_zip_code,
 		c.candidate_full_name,
 		c.candidate_first_last_name,
+		c.candidate_first_name,
+		c.candidate_last_name,
+		c.candidate_middle_name,
 		c.party,
 		c.office,
 		c.juris,
+		c.current_status,
 	}
 }
 
@@ -180,16 +205,21 @@ func (c committee) Header() []string {
 	return []string{
 		"sboe_id",
 		"committee_name",
+		"committee_type",
 		"committee_street_1",
 		"committee_street_2",
 		"committee_city",
 		"committee_state",
-		"committee_zip_code",
+		"committee_full_zip",
 		"candidate_full_name",
 		"candidate_first_last_name",
+		"candidate_first_name",
+		"candidate_last_name",
+		"candidate_middle_name",
 		"party",
 		"office",
 		"juris",
+		"current_status",
 	}
 }
 
@@ -201,6 +231,10 @@ func (c *committee) addReferenceInfo(m map[string]referenceCommittee) {
 	}
 	c.candidate_first_last_name = ref.candidate_first_last_name
 	c.candidate_full_name = ref.candidate_full_name
+	c.candidate_first_name = ref.candidate_first_name
+	c.candidate_last_name = ref.candidate_last_name
+	c.candidate_middle_name = ref.candidate_middle_name
+	c.committee_type = ref.committee_type
 	c.party = ref.party
 	c.office = ref.office
 	c.juris = ref.juris
@@ -345,18 +379,18 @@ func inputToTypes(in input) (transaction, account, committee) {
 	t := transaction{
 		contributor_id:             in.name_id,
 		original_committee_sboe_id: in.committee_sboe_id,
-		original_account_id:        in.name_id,
-		// TODO: delete one of these
-		transaction_type:          in.transaction_type,
-		transaction_category:      in.transaction_type,
-		committee_name:            in.committee_name,
-		canon_committee_sboe_id:   in.committee_sboe_id,
-		date_occurred:             in.date_occured,
-		amount:                    in.amount,
-		form_of_payment:           in.form_of_payment,
-		purpose:                   in.purpose,
-		candidate_referendum_name: in.candidate_referendum_name,
-		declaration:               in.declaration,
+		transaction_type:           in.transaction_type,
+		transaction_category:       "C", // TODO: this will need to be dynamic eventually
+		committee_name:             in.committee_name,
+		canon_committee_sboe_id:    in.committee_sboe_id,
+		date_occurred:              in.date_occured,
+		amount:                     in.amount,
+		report_name:                in.report_name,
+		account_code:               in.account_code,
+		form_of_payment:            in.form_of_payment,
+		purpose:                    in.purpose,
+		candidate_referendum_name:  in.candidate_referendum_name,
+		declaration:                in.declaration,
 	}
 
 	a := account{
@@ -369,6 +403,7 @@ func inputToTypes(in input) (transaction, account, committee) {
 		zip:           in.zip,
 		profession:    in.profession_job_title,
 		employer_name: in.employers_name_specific_field,
+		is_donor:      true, // TODO: should be dynamic
 	}
 
 	c := committee{
@@ -435,6 +470,9 @@ func main() {
 		log.Fatal(err)
 	}
 
+	committeeLookUp := map[string]bool{}
+	accountLookUp := map[string]bool{}
+
 	// limit := 5
 	count := 0
 	for {
@@ -454,15 +492,21 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		err = accountWriter.Write(a.ToCSV())
-		if err != nil {
-			log.Fatal(err)
+		if _, ok := accountLookUp[a.account_id]; !ok {
+			err = accountWriter.Write(a.ToCSV())
+			if err != nil {
+				log.Fatal(err)
+			}
+			accountLookUp[a.account_id] = true
 		}
 
-		c.addReferenceInfo(m)
-		err = committeeWriter.Write(c.ToCSV())
-		if err != nil {
-			log.Fatal(err)
+		if _, ok := committeeLookUp[c.sboe_id]; !ok {
+			c.addReferenceInfo(m)
+			err = committeeWriter.Write(c.ToCSV())
+			if err != nil {
+				log.Fatal(err)
+			}
+			committeeLookUp[c.sboe_id] = true
 		}
 		// if count > limit {
 		// 	break
