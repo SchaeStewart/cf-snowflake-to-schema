@@ -64,6 +64,14 @@ type transaction struct {
 }
 
 func (t transaction) ToCSV() []string {
+	amount := t.amount
+	if amount == "" {
+		amount = "0"
+	}
+	dateOccurred := t.date_occurred
+	if strings.Contains(dateOccurred, "Not Available") {
+		dateOccurred = ""
+	}
 	return []string{
 		fmt.Sprint(t.source_transaction_id),
 		t.contributor_id,
@@ -71,8 +79,8 @@ func (t transaction) ToCSV() []string {
 		t.committee_name,
 		t.canon_committee_sboe_id,
 		t.transaction_category,
-		t.date_occurred,
-		t.amount,
+		dateOccurred,
+		amount,
 		t.report_name,
 		t.account_code,
 		t.form_of_payment,
@@ -226,7 +234,7 @@ func (c committee) Header() []string {
 func (c *committee) addReferenceInfo(m map[string]referenceCommittee) {
 	ref, ok := m[c.sboe_id]
 	if !ok {
-		fmt.Println("no reference found for", c.sboe_id)
+		// fmt.Println("no reference found for", c.sboe_id)
 		return
 	}
 	c.candidate_first_last_name = ref.candidate_first_last_name
@@ -484,7 +492,13 @@ func main() {
 			log.Fatal(err)
 		}
 
-		fmt.Println("processing record", count+1)
+		// fmt.Println("processing record", count+1)
+
+		in := newInput((cleanLine((record))))
+
+		if strings.Contains(in.name, "Aggregated Non-Media Expenditure") {
+			continue
+		}
 
 		t, a, c := inputToTypes(newInput(cleanLine(record)))
 		t.setId(count)
