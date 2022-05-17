@@ -1,4 +1,5 @@
 input.csv
+input*.csv
 cf-snowflake-to-schema
 accounts.csv
 committees.csv

@@ -38,6 +38,39 @@ type input struct {
 	declaration                   string
 	original_name                 string
 	name_id                       string
+	transaction_category          string
+}
+
+func (in input) Header() []string {
+	return []string{
+		"name",
+		"street_line_1",
+		"street_line_2",
+		"city",
+		"state",
+		"zip",
+		"profession_job_title",
+		"employers_name_specific_field",
+		"transaction_type",
+		"committee_name",
+		"committee_sboe_id",
+		"committee_street_1",
+		"committee_street_2",
+		"committee_city",
+		"committee_state",
+		"committee_zip_code",
+		"report_name",
+		"date_occured",
+		"account_code",
+		"amount",
+		"form_of_payment",
+		"purpose",
+		"candidate_referendum_name",
+		"declaration",
+		"original_name",
+		"name_id",
+		"transaction_category",
+	}
 }
 
 type CSVAble interface {
@@ -72,13 +105,21 @@ func (t transaction) ToCSV() []string {
 	if strings.Contains(dateOccurred, "Not Available") {
 		dateOccurred = ""
 	}
+	transactionCategory := t.transaction_category
+	if transactionCategory == "rec" {
+		transactionCategory = "C"
+	}
+	if transactionCategory == "exp" {
+		transactionCategory = "E"
+	}
+
 	return []string{
 		fmt.Sprint(t.source_transaction_id),
 		t.contributor_id,
 		t.transaction_type,
 		t.committee_name,
 		t.canon_committee_sboe_id,
-		t.transaction_category,
+		transactionCategory,
 		dateOccurred,
 		amount,
 		t.report_name,
@@ -342,32 +383,33 @@ func buildReferenceCommitteeMap(path string) (map[string]referenceCommittee, err
 
 func newInput(in []string) input {
 	return input{
-		in[0],
-		in[1],
-		in[2],
-		in[3],
-		in[4],
-		in[5],
-		in[6],
-		in[7],
-		in[8],
-		in[9],
-		in[10],
-		in[11],
-		in[12],
-		in[13],
-		in[14],
-		in[15],
-		in[16],
-		in[17],
-		in[18],
-		in[19],
-		in[20],
-		in[21],
-		in[22],
-		in[23],
-		in[24],
-		in[25],
+		name:          in[0],
+		street_line_1: in[1],
+		street_line_2: in[2],
+
+		state:                         in[4],
+		zip:                           in[5],
+		profession_job_title:          in[6],
+		employers_name_specific_field: in[7],
+		transaction_type:              in[8],
+		committee_name:                in[9],
+		committee_sboe_id:             in[10],
+		committee_street_1:            in[11],
+		committee_street_2:            in[12],
+		committee_city:                in[13],
+		committee_state:               in[14],
+		committee_zip_code:            in[15],
+		report_name:                   in[16],
+		date_occured:                  in[17],
+		account_code:                  in[18],
+		amount:                        in[19],
+		form_of_payment:               in[20],
+		purpose:                       in[21],
+		candidate_referendum_name:     in[22],
+		declaration:                   in[23],
+		original_name:                 in[24],
+		name_id:                       in[25],
+		transaction_category:          in[26],
 	}
 }
 
@@ -388,7 +430,7 @@ func inputToTypes(in input) (transaction, account, committee) {
 		contributor_id:             in.name_id,
 		original_committee_sboe_id: in.committee_sboe_id,
 		transaction_type:           in.transaction_type,
-		transaction_category:       "C", // TODO: this will need to be dynamic eventually
+		transaction_category:       in.transaction_category, // TODO: this will need to be dynamic eventually
 		committee_name:             in.committee_name,
 		canon_committee_sboe_id:    in.committee_sboe_id,
 		date_occurred:              in.date_occured,
@@ -446,6 +488,20 @@ func buildCSVWriter(fileName string, c CSVAble) (*csv.Writer, error) {
 	return writer, nil
 }
 
+func verifyHeadersNoCase(expected, actual []string) error {
+	if len(expected) != len(actual) {
+		return fmt.Errorf("mismatched header lengths: expected %d, actual %d", len(expected), len(actual))
+	}
+
+	for i, v := range expected {
+		if !strings.EqualFold(v, strings.ToLower(actual[i])) {
+			return fmt.Errorf("mismatched headers: expected header #%d to be %s, instead got %s", i, v, actual[i])
+		}
+	}
+
+	return nil
+}
+
 func main() {
 	in, err := os.Open("./input.csv")
 	if err != nil {
@@ -473,8 +529,12 @@ func main() {
 	}
 
 	r := csv.NewReader(in)
-	// skip header
-	if _, err := r.Read(); err != nil {
+	inputHeader, err := r.Read()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := verifyHeadersNoCase(input{}.Header(), inputHeader); err != nil {
 		log.Fatal(err)
 	}
 
@@ -494,13 +554,13 @@ func main() {
 
 		// fmt.Println("processing record", count+1)
 
-		in := newInput((cleanLine((record))))
+		in := newInput(cleanLine(record))
 
-		if strings.Contains(in.name, "Aggregated Non-Media Expenditure") {
-			continue
-		}
+		// if strings.Contains(in.name, "Aggregated Non-Media Expenditure") {
+		// 	continue
+		// }
 
-		t, a, c := inputToTypes(newInput(cleanLine(record)))
+		t, a, c := inputToTypes(in)
 		t.setId(count)
 		err = transactionWriter.Write(t.ToCSV())
 		if err != nil {
