@@ -172,9 +172,24 @@ type account struct {
 	is_organization bool
 }
 
+var accountIdBase int = 100_000
+
+// HACK: currently snowflake only assigns an accountId if the contributor
+// is matched to another contributor
+// Either update dashboard schema and UI to work without an accountId
+// or figure out a better way to do this
+func getAccountId() string {
+	accountIdBase++
+	return fmt.Sprint(accountIdBase)
+}
+
 func (a account) ToCSV() []string {
+	accountId := a.account_id
+	if strings.EqualFold(accountId, "NULL") || accountId == "" {
+		accountId = getAccountId()
+	}
 	return []string{
-		a.account_id,
+		accountId,
 		a.name,
 		// a.street_line_1,
 		// a.street_line_2,
